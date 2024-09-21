@@ -1,6 +1,7 @@
 use aes_gcm::aead::{Aead, KeyInit, OsRng};
 use aes_gcm::{Aes256Gcm, Nonce};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Result};
+use rand::rngs::OsRng;
 use rand::RngCore;
 
 const NONCE_SIZE: usize = 12;
@@ -10,7 +11,7 @@ const NONCE_SIZE: usize = 12;
 pub fn encrypt_data(key: &[u8], plaintext: &[u8]) -> Result<(Vec<u8>, [u8; NONCE_SIZE])> {
     // initialize the cipher
     let cipher = Aes256Gcm::new_from_slice(key)
-        .with_context(|| "Failed to initialize AES-256GCM cipher")?;
+        .map_err(|_| anyhow!("Failed to initialize AES-256GCM cipher"))?;
 
     // generate a random nonce
     let mut nonce_bytes = [0u8; NONCE_SIZE];
@@ -20,7 +21,26 @@ pub fn encrypt_data(key: &[u8], plaintext: &[u8]) -> Result<(Vec<u8>, [u8; NONCE
     // encrypt plaintext
     let ciphertext = cipher
         .encrypt(nonce, plaintext)
-        .with_context(|| "encryption failed")?;
+        .map_err(|_| anyhow!("encryption failed"))?;
 
     Ok((ciphertext, nonce_bytes))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::key_management::generate_key;
+
+    #[test]
+    fn test_encrypt_data() {
+        let key = generate_key();
+        let plaintext = b"Test plaintext data";
+        let (ciphertext, nonce) = encrypt_data(&key, plaintext).expect("Encryption failed");
+
+        assert!(!ciphertext.is_empty(), "Ciphertext should not be empty");
+        assert_eq!(nonce.len(), NONCE_SIZE, "Nonce size should be correct");
+    }
+}
+
+
+
