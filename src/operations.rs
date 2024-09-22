@@ -4,7 +4,6 @@ use crate::encryption::encrypt_data;
 use crate::file_io::{create_and_write_file, append_to_file, ensure_directory_exists, read_file, write_file};
 use crate::key_management::{generate_key, load_key_from_file, save_key_to_file, KEY_SIZE};
 use anyhow::{anyhow, Context, Result};
-use std::io::Write;
 use std::path::Path;
 
 const NONCE_SIZE: usize = 12; // 96 bit nonce size for AES-GCM
@@ -88,4 +87,56 @@ pub fn decrypt_file(args: &DecryptArgs) -> Result<()> {
     println!("File decrypted successfully: {}", output_path);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::key_management::generate_key;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_encrypt_and_decrypt() {
+        let dir = tempdir().expect("Failed to create temp dir");
+        let input_file = dir.path().join("input.txt");
+        let encrypted_file = dir.path().join("input.txt.enc");
+        let decrypted_file = dir.path().join("input_decrypted.txt");
+        let key_file = dir.path().join("test.key");
+
+        let input_data = b"Secret message to encrypt";
+
+        // write input data to file
+        write_file(input_file.to_str().unwrap(), input_data)
+            .expect("Failed to write input file");
+
+        // create EncryptArgs
+        let encrypt_args = EncryptArgs {
+            input: input_file.to_str().unwrap().to_string(),
+            output: Some(encrypted_file.to_str().unwrap().to_string()),
+            key: Some(key_file.to_str().unwrap().to_string()),
+        };
+
+        // encrypt the file
+        encrypt_file(&encrypt_args).expect("Encryption failed");
+
+        // create DecryptArgs
+        let decrypt_args = DecryptArgs {
+            input: encrypted_file.to_str().unwrap().to_string(),
+            output: Some(decrypted_file.to_str().unwrap().to_string()),
+            key: Some(key_file.to_str().unwrap().to_string()),
+        };
+
+        // decrypt the file
+        decrypt_file(&decrypt_args).expect("Decryption failed");
+        
+        // verify the decrypted data matches the original
+        let decrypted_data = read_file(decrypted_file.to_str().unwrap())
+            .expect("Failed to read decrypted file");
+        assert_eq!(
+            input_data.to_vec(),
+            decrypted_data,
+            "Decrypted data should match original input data"
+        );
+    }
+}
+
 
