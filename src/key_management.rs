@@ -1,8 +1,4 @@
-use anyhow::{Context, Result};
-use rand::rngs::OsRng;
-use rand::RngCore;
-use std::path::Path;
-
+use anyhow::{anyhow, Result};
 use crate::file_io::{create_and_write_file, ensure_directory_exists, read_file};
 
 // key size in bytes (32 bytes for AES-256)
@@ -36,6 +32,35 @@ pub fn load_key_from_file(path: &str) -> Result<Vec<u8>> {
     }
 
     Ok(key)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_generate_key() {
+        let key = generate_key();
+        assert_eq!(key.len(), KEY_SIZE, "Key size should be correct.");
+    }
+
+    #[test]
+    fn test_save_and_load_key() {
+        let key = generate_key();
+        let dir = tempdir().expect("Failed to create temp dir");
+        let file_path = dir.path().join("test.key");
+        let path_str = file_path.to_str().unwrap();
+
+        // save the key
+        save_key_to_file(&key, path_str).expect("Failed to save key");
+
+        // load the key
+        let loaded_key = load_key_from_file(path_str).expect("Failed to load key");
+
+        assert_eq!(key.to_vec(), loaded_key, "Loaded key should match original");
+    }
 }
 
 
